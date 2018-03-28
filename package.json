@@ -1,7 +1,7 @@
 {
-  "name": "coin-hive-stratum",
-  "version": "2.6.11",
-  "description": "proxy to use CoinHive miner on any stratum pool",
+  "name": "stratum-proxy",
+  "version": "0.0.1",
+  "description": "Proxy stratum connections to another pool",
   "main": "build",
   "typings": "build/typings/index.d.ts",
   "scripts": {
@@ -14,19 +14,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cazala/coin-hive-stratum.git"
+    "url": "git+https://github.com/mikeruddy/stratum-proxy.git"
   },
   "keywords": [
-    "coinhive",
     "stratum",
     "proxy"
   ],
   "author": "",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/cazala/coin-hive-stratum/issues"
+    "url": "https://github.com/mikeruddy/stratum-proxy/issues"
   },
-  "homepage": "https://github.com/cazala/coin-hive-stratum#readme",
+  "homepage": "https://github.com/mikeruddy/stratum-proxy#readme",
   "dependencies": {
     "@types/node": "^8.0.53",
     "@types/ws": "^3.2.0",
@@ -38,8 +37,5 @@
     "uuid": "^3.1.0",
     "watch": "^1.0.2",
     "ws": "^3.2.0"
-  },
-  "bin": {
-    "coin-hive-stratum": "./bin/coin-hive-stratum"
   }
 }
