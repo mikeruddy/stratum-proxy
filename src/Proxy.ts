@@ -1,5 +1,6 @@
 import * as EventEmitter from "events";
 import * as WebSocket from "ws";
+import * as net from "net";
 import * as url from "url";
 import * as http from "http";
 import * as https from "https";
@@ -25,6 +26,9 @@ import { ServerRequest } from "http";
 export type Options = {
   host: string;
   port: number;
+  buffer: string;
+  portStratum: number;
+  socket: object | null;
   pass: string;
   ssl: false;
   address: string | null;
@@ -43,6 +47,9 @@ export type Options = {
 class Proxy extends EventEmitter {
   host: string = null;
   port: number = null;
+  portStratum: number = null;
+  socket: object = null;
+  buffer: string = "";
   pass: string = null;
   ssl: boolean = null;
   address: string = null;
@@ -65,6 +72,7 @@ class Proxy extends EventEmitter {
     let options = Object.assign({}, defaults, constructorOptions) as Options;
     this.host = options.host;
     this.port = options.port;
+    this.portStratum = options.portStratum;
     this.pass = options.pass;
     this.ssl = options.ssl;
     this.address = options.address;
@@ -200,6 +208,7 @@ class Proxy extends EventEmitter {
       );
       const miner = new Miner({
         connection,
+        stratumSocket: null,
         ws,
         address: this.address,
         user: this.user,
@@ -216,6 +225,57 @@ class Proxy extends EventEmitter {
       miner.on("error", (data: ErrorEvent) => this.emit("error", data));
       miner.connect();
     });
+    
+    
+    let handleConnection = function(conn) {
+      let host = this.host;
+      let port = this.port;
+      let pass = this.pass;
+
+      const connection = this.getConnection(this.host, this.port);
+      const donations = this.donations.map(
+        donation =>
+          new Donation({
+            address: donation.address,
+            host: donation.host,
+            port: donation.port,
+            pass: donation.pass,
+            percentage: donation.percentage,
+            connection: this.getConnection(donation.host, donation.port, true)
+          })
+      );
+      const miner = new Miner({
+        connection,
+        ws: null,
+        stratumSocket: conn,
+        address: this.address,
+        user: null,
+        diff: null,
+        pass,
+        donations
+      });
+      miner.on("open", (data: OpenEvent) => this.emit("open", data));
+      miner.on("authed", (data: AuthedEvent) => this.emit("authed", data));
+      miner.on("job", (data: JobEvent) => this.emit("job", data));
+      miner.on("found", (data: FoundEvent) => this.emit("found", data));
+      miner.on("accepted", (data: AcceptedEvent) => this.emit("accepted", data));
+      miner.on("close", (data: CloseEvent) => this.emit("close", data));
+      miner.on("error", (data: ErrorEvent) => this.emit("error", data));
+      miner.connect();
+      
+      
+    }
+    
+    if(this.portStratum) {
+      var server = net.createServer();
+      server.on('connection', handleConnection.bind(this));
+      server.listen(9999, function() {  
+        console.log('server listening to %j', server.address());
+      });
+    }
+    
+    
+    
     if (!host && !callback) {
       this.server.listen(port);
     } else if (!host && callback) {

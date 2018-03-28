@@ -82,27 +82,6 @@ class Connection extends EventEmitter {
       connectionsCounter.inc();
     }
   }
-
-  kill() {
-    if (this.socket != null) {
-      try {
-        this.socket.end();
-        this.socket.destroy();
-      } catch (e) {
-        console.warn(`something went wrong while destroying socket (${this.host}:${this.port}):`, e.message);
-      }
-    }
-    if (this.queue != null) {
-      this.queue.stop();
-    }
-    if (this.online) {
-      this.online = false;
-      if (!this.donation) {
-        connectionsCounter.dec();
-      }
-    }
-  }
-
   ready() {
     // message from pool
     this.socket.on("data", chunk => {
@@ -155,6 +134,8 @@ class Connection extends EventEmitter {
     } catch (e) {
       return console.warn(`invalid stratum message:`, message);
     }
+    
+    console.log('STRTUM MSG', data)
     // it's a response
     if (data.id) {
       const response = data as StratumResponse;
@@ -176,7 +157,7 @@ class Connection extends EventEmitter {
           const auth = result.id;
           this.auth[minerId] = auth;
           this.minerId[auth] = minerId;
-          this.emit(minerId + ":authed", auth);
+          this.emit(minerId + ":authed", auth, data);
           if (result.job) {
             this.emit(minerId + ":job", result.job);
           }
@@ -209,13 +190,13 @@ class Connection extends EventEmitter {
             // miner is not online anymore
             return;
           }
-          this.emit(minerId + ":job", request.params);
+          console.log('PASS NEW JOB', request)
+          this.emit(minerId + ":job", request.params, request);
           break;
         }
       }
     }
   }
-
   send(id: string, method: string, params: StratumRequestParams = {}) {
     let message: StratumRequest = {
       id: this.rpcId++,
@@ -223,8 +204,10 @@ class Connection extends EventEmitter {
       params
     };
 
+    console.log('SEND TO STRATUM', message)
     switch (method) {
       case "login": {
+        console.log('DO NOTHIN')
         // ..
         break;
       }
@@ -256,13 +239,12 @@ class Connection extends EventEmitter {
       payload: message
     });
   }
-
+  
   addMiner(miner: Miner): void {
     if (this.miners.indexOf(miner) === -1) {
       this.miners.push(miner);
     }
   }
-
   removeMiner(minerId: string): void {
     const miner = this.miners.find(x => x.id === minerId);
     if (miner) {
@@ -276,7 +258,6 @@ class Connection extends EventEmitter {
       this.donations.push(donation);
     }
   }
-
   removeDonation(donationId: string): void {
     const donation = this.donations.find(x => x.id === donationId);
     if (donation) {
@@ -284,7 +265,25 @@ class Connection extends EventEmitter {
       this.clear(donation.id);
     }
   }
-
+  kill() {
+      if (this.socket != null) {
+        try {
+          this.socket.end();
+          this.socket.destroy();
+        } catch (e) {
+          console.warn(`something went wrong while destroying socket (${this.host}:${this.port}):`, e.message);
+        }
+      }
+      if (this.queue != null) {
+        this.queue.stop();
+      }
+      if (this.online) {
+        this.online = false;
+        if (!this.donation) {
+          connectionsCounter.dec();
+        }
+      }
+    }
   clear(id: string): void {
     const auth = this.auth[id];
     delete this.auth[id];
