@@ -47,6 +47,7 @@ class Miner extends EventEmitter {
   online: boolean = false;
   jobs: Job[] = [];
   hashes: number = 0;
+  worker: string = null;
 
   constructor(options: Options) {
     super();
@@ -82,6 +83,17 @@ class Miner extends EventEmitter {
     
     if(this.stratumSocket) {
       this.buffer = '';
+      
+      
+      this.stratumSocket.setKeepAlive(true);
+      this.stratumSocket.setEncoding("utf8");
+      
+      this.stratumSocket.on("error", error => {
+        this.kill();
+      });
+      this.stratumSocket.on("close", () => {
+        this.kill();
+      });
       this.stratumSocket.on("data", chunk => {
         this.buffer += chunk;
         while (this.buffer.includes("\n")) {
@@ -114,6 +126,7 @@ class Miner extends EventEmitter {
   }
 
   kill() {
+    console.log('KILL ', this.id)
     this.queue.stop();
     this.connection.removeMiner(this.id);
     this.connection.removeAllListeners(this.id + ":authed");
@@ -127,10 +140,11 @@ class Miner extends EventEmitter {
     if(this.ws) {
       this.ws.close();
     }
-    if (this.stratumSocket != null) {
+    if (this.stratumSocket) {
       try {
         this.stratumSocket.end();
         this.stratumSocket.destroy();
+        console.warn('destroyed the socket')
       } catch (e) {
         console.warn(`something went wrong while destroying socket (${this.id}):`, e.message);
       }
@@ -145,7 +159,8 @@ class Miner extends EventEmitter {
       console.log(`miner disconnected (${this.id})`);
       this.emit("close", {
         id: this.id,
-        login: this.login
+        login: this.login,
+        worker: this.worker
       });
     }
     this.removeAllListeners();
@@ -153,17 +168,6 @@ class Miner extends EventEmitter {
 
   sendToMiner(payload: CoinHiveResponse) {
     const coinhiveMessage = JSON.stringify(payload);
-    
-    if(this.stratumSocket && this.stratumSocket.write) {
-      try {
-        console.log('BROKE: SENDING TO MINER', payload)
-        this.stratumSocket.write(JSON.stringify(payload) + "\n");
-      } catch(e) {
-        console.log('KILLED')
-        this.kill();
-      }
-    }
-    
     if (this.online && this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(coinhiveMessage);
@@ -175,8 +179,8 @@ class Miner extends EventEmitter {
 
   sendToStratumMiner(payload: any) {
     if(this.stratumSocket && this.stratumSocket.write) {
-      console.log('SEND TO STRATUM', typeof payload, payload)
-      this.stratumSocket.write(JSON.stringify(payload) + "\n");
+      console.log('TO MINER', payload)
+      this.stratumSocket.write(JSON.stringify(payload).replace(/\r?\n|\r/g, "") + "\n");
     } else {
       this.kill();
     }
@@ -211,8 +215,9 @@ class Miner extends EventEmitter {
     this.emit("authed", {
       id: this.id,
       login: this.login,
+      worker: this.worker,
       auth
-    });
+    }, response);
   }
 
   handleJob(job: Job, request: StratumRequest): void {
@@ -234,7 +239,6 @@ class Miner extends EventEmitter {
       }
       
       if(this.stratumSocket) {
-        console.log('SENT MINER NEW JOB')
         this.sendToStratumMiner(request);
       }
       
@@ -242,7 +246,8 @@ class Miner extends EventEmitter {
     this.emit("job", {
       id: this.id,
       login: this.login,
-      job
+      job,
+      worker: this.worker
     });
   }
 
@@ -251,16 +256,24 @@ class Miner extends EventEmitter {
     console.log(`shares accepted (${this.id}):`, this.hashes);
     sharesCounter.inc();
     sharesMeter.mark();
-    this.sendToMiner({
-      type: "hash_accepted",
-      params: {
-        hashes: this.hashes
-      }
-    });
+    if(this.ws) {
+      this.sendToMiner({
+        type: "hash_accepted",
+        params: {
+          hashes: this.hashes
+        }
+      });
+    }
+    
+    if(this.stratumSocket) {
+      this.sendToStratumMiner(job);
+    }
+    
     this.emit("accepted", {
       id: this.id,
       login: this.login,
-      hashes: this.hashes
+      hashes: this.hashes,
+      worker: this.worker
     });
   }
 
@@ -296,6 +309,9 @@ class Miner extends EventEmitter {
     
     switch (data.method) {
       case "login": {
+        
+        console.log('LOGIN MINER', data)
+        
         const params = data.params as CoinHiveLoginParams;
         this.login = this.address || params.site_key;
         const user = this.user || params.user;
@@ -320,12 +336,7 @@ class Miner extends EventEmitter {
         } else {
           const donation = this.getDonation(job);
           donation.submit(job);
-          this.sendToMiner({
-            type: "hash_accepted",
-            params: {
-              hashes: ++this.hashes
-            }
-          });
+          // this.sendToStratumMiner(data);
         }
         this.emit("found", {
           id: this.id,
@@ -345,17 +356,26 @@ class Miner extends EventEmitter {
       console.warn(`can't parse message as JSON from miner:`, message, e.message);
       return;
     }
+    
+    
     switch (data.type) {
       case "auth": {
         const params = data.params as CoinHiveLoginParams;
         this.login = this.address || params.site_key;
         const user = this.user || params.user;
+        this.worker = user;
+        
+        console.log('USER IS', this.worker)
+        
         if (user) {
           this.login += "." + user;
         }
         if (this.diff) {
           this.login += "+" + this.diff;
         }
+        
+        
+        
         this.sendToPool("login", {
           login: this.login,
           pass: this.pass
@@ -381,7 +401,8 @@ class Miner extends EventEmitter {
         this.emit("found", {
           id: this.id,
           login: this.login,
-          job
+          job,
+          worker: this.worker
         });
         break;
       }

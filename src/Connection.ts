@@ -135,7 +135,6 @@ class Connection extends EventEmitter {
       return console.warn(`invalid stratum message:`, message);
     }
     
-    console.log('STRTUM MSG', data)
     // it's a response
     if (data.id) {
       const response = data as StratumResponse;
@@ -150,31 +149,33 @@ class Connection extends EventEmitter {
           if (response.error && response.error.code === -1) {
             this.emit(minerId + ":error", {
               error: "invalid_site_key"
-            });
+            }, response);
             return;
           }
           const result = response.result as StratumLoginResult;
           const auth = result.id;
           this.auth[minerId] = auth;
           this.minerId[auth] = minerId;
-          this.emit(minerId + ":authed", auth, data);
+          
           if (result.job) {
-            this.emit(minerId + ":job", result.job);
+            this.emit(minerId + ":job", result.job, response);
+          } else {
+            this.emit(minerId + ":authed", auth, response);
           }
           break;
         }
         case "submit": {
           const job = this.rpc[response.id].message.params as StratumJob;
           if (response.result && response.result.status === "OK") {
-            this.emit(minerId + ":accepted", job);
+            this.emit(minerId + ":accepted", job, response);
           } else if (response.error) {
-            this.emit(minerId + ":error", response.error);
+            this.emit(minerId + ":error", response.error, response);
           }
           break;
         }
         default: {
           if (response.error && response.error.code === -1) {
-            this.emit(minerId + ":error", response.error);
+            this.emit(minerId + ":error", response.error, response);
           }
         }
       }
@@ -188,9 +189,12 @@ class Connection extends EventEmitter {
           const minerId = this.minerId[jobParams.id];
           if (!minerId) {
             // miner is not online anymore
+            console.log('KILL CONNECTIOn')
+            // this.kill();
             return;
           }
-          console.log('PASS NEW JOB', request)
+          
+          // console.log('EMIT JOB', request)
           this.emit(minerId + ":job", request.params, request);
           break;
         }
@@ -204,10 +208,8 @@ class Connection extends EventEmitter {
       params
     };
 
-    console.log('SEND TO STRATUM', message)
     switch (method) {
       case "login": {
-        console.log('DO NOTHIN')
         // ..
         break;
       }
@@ -246,6 +248,7 @@ class Connection extends EventEmitter {
     }
   }
   removeMiner(minerId: string): void {
+    console.log('removing miner ', minerId)
     const miner = this.miners.find(x => x.id === minerId);
     if (miner) {
       this.miners = this.miners.filter(x => x.id !== minerId);

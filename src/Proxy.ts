@@ -188,6 +188,10 @@ class Proxy extends EventEmitter {
       let host = this.host;
       let port = this.port;
       let pass = this.pass;
+      
+      console.log('AUTH INFO', this.user, this.address);
+      
+      
       if (params.pool && this.dynamicPool) {
         const split = params.pool.split(":");
         host = split[0] || this.host;
@@ -227,7 +231,7 @@ class Proxy extends EventEmitter {
     });
     
     
-    let handleConnection = function(conn) {
+    let handleConnection = (conn) => {
       let host = this.host;
       let port = this.port;
       let pass = this.pass;
@@ -249,8 +253,8 @@ class Proxy extends EventEmitter {
         ws: null,
         stratumSocket: conn,
         address: this.address,
-        user: null,
-        diff: null,
+        user: this.user,
+        diff: this.diff,
         pass,
         donations
       });
@@ -268,7 +272,7 @@ class Proxy extends EventEmitter {
     
     if(this.portStratum) {
       var server = net.createServer();
-      server.on('connection', handleConnection.bind(this));
+      server.on('connection', handleConnection);
       server.listen(9999, function() {  
         console.log('server listening to %j', server.address());
       });
