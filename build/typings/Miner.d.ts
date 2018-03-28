@@ -1,0 +1,52 @@
+/// <reference types="node" />
+import * as EventEmitter from "events";
+import * as WebSocket from "ws";
+import Connection from "./Connection";
+import Donation from "./Donation";
+import Queue from "./Queue";
+import { Job, CoinHiveResponse, StratumRequest, StratumResponse, StratumRequestParams, StratumError, StratumJob } from "./types";
+export declare type Options = {
+    connection: Connection | null;
+    ws: WebSocket | null;
+    stratumSocket: any | null;
+    address: string | null;
+    user: string | null;
+    diff: number | null;
+    pass: string | null;
+    donations: Donation[] | null;
+};
+declare class Miner extends EventEmitter {
+    id: string;
+    buffer: string;
+    login: string;
+    address: string;
+    user: string;
+    diff: number;
+    pass: string;
+    stratumSocket: any;
+    donations: Donation[];
+    heartbeat: NodeJS.Timer;
+    connection: Connection;
+    queue: Queue;
+    ws: WebSocket;
+    online: boolean;
+    jobs: Job[];
+    hashes: number;
+    worker: string;
+    constructor(options: Options);
+    connect(): Promise<void>;
+    kill(): void;
+    sendToMiner(payload: CoinHiveResponse): void;
+    sendToStratumMiner(payload: any): void;
+    sendToPool(method: string, params: StratumRequestParams): void;
+    handleAuthed(auth: string, response: StratumResponse): void;
+    handleJob(job: Job, request: StratumRequest): void;
+    handleAccepted(job: StratumJob): void;
+    handleError(error: StratumError): void;
+    handleStratumMessage(message: string): void;
+    handleMessage(message: string): void;
+    isDonation(job: Job): boolean;
+    getDonation(job: Job): Donation;
+    hasPendingDonations(): boolean;
+}
+export default Miner;
