@@ -88,7 +88,6 @@ var Miner = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         console.log("miner connected (" + this.id + ") via " + (this.ws ? 'WebSocket' : 'Stratum'));
-                        Metrics_1.minersCounter.inc();
                         if (this.ws) {
                             this.donations.forEach(function (donation) { return donation.connect(); });
                             this.ws.on("message", this.handleMessage.bind(this));
@@ -104,6 +103,11 @@ var Miner = /** @class */ (function (_super) {
                                     _this.kill();
                                 }
                             });
+                            Metrics_1.minersCounter.inc();
+                            this.connection.on(this.id + ":authed", this.handleAuthed.bind(this));
+                            this.connection.on(this.id + ":job", this.handleJob.bind(this));
+                            this.connection.on(this.id + ":accepted", this.handleAccepted.bind(this));
+                            this.connection.on(this.id + ":error", this.handleError.bind(this));
                         }
                         if (this.stratumSocket) {
                             this.buffer = '';
@@ -125,11 +129,6 @@ var Miner = /** @class */ (function (_super) {
                                 }
                             });
                         }
-                        this.connection.addMiner(this);
-                        this.connection.on(this.id + ":authed", this.handleAuthed.bind(this));
-                        this.connection.on(this.id + ":job", this.handleJob.bind(this));
-                        this.connection.on(this.id + ":accepted", this.handleAccepted.bind(this));
-                        this.connection.on(this.id + ":error", this.handleError.bind(this));
                         this.queue.on("message", function (message) {
                             return _this.connection.send(_this.id, message.method, message.params);
                         });
@@ -205,10 +204,64 @@ var Miner = /** @class */ (function (_super) {
     Miner.prototype.sendToStratumMiner = function (payload) {
         if (this.stratumSocket && this.stratumSocket.write) {
             console.log('TO MINER', payload);
-            this.stratumSocket.write(JSON.stringify(payload).replace(/\r?\n|\r/g, "") + "\n");
+            this.stratumSocket.write(JSON.stringify(payload) + "\n");
         }
         else {
             this.kill();
+        }
+    };
+    Miner.prototype.handleStratumMessage = function (message) {
+        var data;
+        try {
+            data = JSON.parse(message);
+        }
+        catch (e) {
+            console.warn("can't parse message as JSON from miner:", message, e.message);
+            return;
+        }
+        switch (data.method) {
+            case "login": {
+                var params = data.params;
+                this.login = this.address || params.site_key;
+                var user = this.user || params.user;
+                if (user) {
+                    this.login += "." + user;
+                }
+                if (this.diff) {
+                    this.login += "+" + this.diff;
+                }
+                this.id = params.login;
+                Metrics_1.minersCounter.inc();
+                this.connection.on(this.id + ":authed", this.handleAuthed.bind(this));
+                this.connection.on(this.id + ":job", this.handleJob.bind(this));
+                this.connection.on(this.id + ":accepted", this.handleAccepted.bind(this));
+                this.connection.on(this.id + ":error", this.handleError.bind(this));
+                this.connection.on(this.id + ":result", this.handleResult.bind(this));
+                this.connection.addMiner(this);
+                this.sendToPool("login", {
+                    login: this.login,
+                    pass: this.pass
+                });
+                break;
+            }
+            case "submit": {
+                var job = data.params;
+                console.log("job submitted (" + this.id + "):", job.job_id);
+                if (!this.isDonation(job)) {
+                    this.sendToPool("submit", job);
+                }
+                else {
+                    var donation = this.getDonation(job);
+                    donation.submit(job);
+                    // this.sendToStratumMiner(data);
+                }
+                this.emit("found", {
+                    id: this.id,
+                    login: this.login,
+                    job: job
+                });
+                break;
+            }
         }
     };
     Miner.prototype.sendToPool = function (method, params) {
@@ -270,6 +323,12 @@ var Miner = /** @class */ (function (_super) {
             worker: this.worker
         });
     };
+    Miner.prototype.handleResult = function (response) {
+        if (this.stratumSocket) {
+            console.log('sending result back to miner', response);
+            this.sendToStratumMiner(response);
+        }
+    };
     Miner.prototype.handleAccepted = function (job) {
         this.hashes++;
         console.log("shares accepted (" + this.id + "):", this.hashes);
@@ -297,10 +356,15 @@ var Miner = /** @class */ (function (_super) {
         console.warn("pool connection error (" + this.id + "):", error.error || (error && JSON.stringify(error)) || "unknown error");
         if (this.online) {
             if (error.error === "invalid_site_key") {
-                this.sendToMiner({
-                    type: "error",
-                    params: error
-                });
+                if (this.ws) {
+                    this.sendToMiner({
+                        type: "error",
+                        params: error
+                    });
+                }
+            }
+            if (this.stratumSocket) {
+                this.sendToStratumMiner(error);
             }
             this.emit("error", {
                 id: this.id,
@@ -309,53 +373,6 @@ var Miner = /** @class */ (function (_super) {
             });
         }
         this.kill();
-    };
-    Miner.prototype.handleStratumMessage = function (message) {
-        var data;
-        try {
-            data = JSON.parse(message);
-        }
-        catch (e) {
-            console.warn("can't parse message as JSON from miner:", message, e.message);
-            return;
-        }
-        switch (data.method) {
-            case "login": {
-                console.log('LOGIN MINER', data);
-                var params = data.params;
-                this.login = this.address || params.site_key;
-                var user = this.user || params.user;
-                if (user) {
-                    this.login += "." + user;
-                }
-                if (this.diff) {
-                    this.login += "+" + this.diff;
-                }
-                this.sendToPool("login", {
-                    login: this.login,
-                    pass: this.pass
-                });
-                break;
-            }
-            case "submit": {
-                var job = data.params;
-                console.log("job submitted (" + this.id + "):", job.job_id);
-                if (!this.isDonation(job)) {
-                    this.sendToPool("submit", job);
-                }
-                else {
-                    var donation = this.getDonation(job);
-                    donation.submit(job);
-                    // this.sendToStratumMiner(data);
-                }
-                this.emit("found", {
-                    id: this.id,
-                    login: this.login,
-                    job: job
-                });
-                break;
-            }
-        }
     };
     Miner.prototype.handleMessage = function (message) {
         var data;

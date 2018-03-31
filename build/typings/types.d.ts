@@ -51,6 +51,7 @@ export declare type CoinHiveRequest = {
 };
 export declare type CoinHiveLoginParams = {
     site_key: string;
+    login?: string | null;
     user: string | null;
 };
 export declare type CoinHiveJob = Job;
@@ -73,6 +74,7 @@ export declare type StratumRequest = {
     method: string;
     params: StratumRequestParams;
     retry?: number;
+    result?: any;
 };
 export declare type StratumRequestParams = StratumLoginParams | StratumJob | StratumKeepAlive | StratumEmptyParams;
 export declare type StratumLoginParams = {

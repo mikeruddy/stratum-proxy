@@ -38,12 +38,13 @@ declare class Miner extends EventEmitter {
     kill(): void;
     sendToMiner(payload: CoinHiveResponse): void;
     sendToStratumMiner(payload: any): void;
+    handleStratumMessage(message: string): void;
     sendToPool(method: string, params: StratumRequestParams): void;
     handleAuthed(auth: string, response: StratumResponse): void;
     handleJob(job: Job, request: StratumRequest): void;
+    handleResult(response: StratumResponse): void;
     handleAccepted(job: StratumJob): void;
     handleError(error: StratumError): void;
-    handleStratumMessage(message: string): void;
     handleMessage(message: string): void;
     isDonation(job: Job): boolean;
     getDonation(job: Job): Donation;

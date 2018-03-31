@@ -144,6 +144,11 @@ class Connection extends EventEmitter {
       }
       const minerId = this.rpc[response.id].minerId;
       const method = this.rpc[response.id].message.method;
+      
+      if(!data.method && response.result && response.result.status === 'OK') {
+        this.emit(minerId + ":result", data);
+      }
+      
       switch (method) {
         case "login": {
           if (response.error && response.error.code === -1) {
@@ -185,12 +190,11 @@ class Connection extends EventEmitter {
       const request = data as StratumRequest;
       switch (request.method) {
         case "job": {
+          console.log(`JOB for miner:`,this.minerId)
           const jobParams = request.params as StratumJob;
           const minerId = this.minerId[jobParams.id];
           if (!minerId) {
             // miner is not online anymore
-            console.log('KILL CONNECTIOn')
-            // this.kill();
             return;
           }
           

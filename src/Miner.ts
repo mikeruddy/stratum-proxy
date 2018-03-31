@@ -63,7 +63,7 @@ class Miner extends EventEmitter {
 
   async connect() {
     console.log(`miner connected (${this.id}) via ${this.ws ? 'WebSocket' : 'Stratum'}`);
-    minersCounter.inc();
+    
     if(this.ws) {
       this.donations.forEach(donation => donation.connect());
       this.ws.on("message", this.handleMessage.bind(this));
@@ -78,7 +78,13 @@ class Miner extends EventEmitter {
           console.log(`miner connection error (${this.id}):`, error.message);
           this.kill();
         }
-      });  
+      });
+      
+      minersCounter.inc();
+      this.connection.on(this.id + ":authed", this.handleAuthed.bind(this));
+      this.connection.on(this.id + ":job", this.handleJob.bind(this));
+      this.connection.on(this.id + ":accepted", this.handleAccepted.bind(this));
+      this.connection.on(this.id + ":error", this.handleError.bind(this));
     }
     
     if(this.stratumSocket) {
@@ -105,11 +111,7 @@ class Miner extends EventEmitter {
       });
     }
     
-    this.connection.addMiner(this);
-    this.connection.on(this.id + ":authed", this.handleAuthed.bind(this));
-    this.connection.on(this.id + ":job", this.handleJob.bind(this));
-    this.connection.on(this.id + ":accepted", this.handleAccepted.bind(this));
-    this.connection.on(this.id + ":error", this.handleError.bind(this));
+    
     this.queue.on("message", (message: StratumRequest) =>
       this.connection.send(this.id, message.method, message.params)
     );
@@ -180,9 +182,69 @@ class Miner extends EventEmitter {
   sendToStratumMiner(payload: any) {
     if(this.stratumSocket && this.stratumSocket.write) {
       console.log('TO MINER', payload)
-      this.stratumSocket.write(JSON.stringify(payload).replace(/\r?\n|\r/g, "") + "\n");
+      this.stratumSocket.write(JSON.stringify(payload) + "\n");
     } else {
       this.kill();
+    }
+  }
+  
+  handleStratumMessage(message: string) {
+    let data: StratumRequest;
+    try {
+      data = JSON.parse(message);
+    } catch (e) {
+      console.warn(`can't parse message as JSON from miner:`, message, e.message);
+      return;
+    }
+    
+    switch (data.method) {
+      case "login": {
+        const params = data.params as CoinHiveLoginParams;
+        this.login = this.address || params.site_key;
+        const user = this.user || params.user;
+        if (user) {
+          this.login += "." + user;
+        }
+        if (this.diff) {
+          this.login += "+" + this.diff;
+        }
+        
+        this.id = params.login;
+        
+        
+        minersCounter.inc();
+        this.connection.on(this.id + ":authed", this.handleAuthed.bind(this));
+        this.connection.on(this.id + ":job", this.handleJob.bind(this));
+        this.connection.on(this.id + ":accepted", this.handleAccepted.bind(this));
+        this.connection.on(this.id + ":error", this.handleError.bind(this));
+        this.connection.on(this.id + ":result", this.handleResult.bind(this));
+        
+        this.connection.addMiner(this);
+        
+        this.sendToPool("login", {
+          login: this.login,
+          pass: this.pass
+        });
+        break;
+      }
+
+      case "submit": {
+        const job = data.params as Job;
+        console.log(`job submitted (${this.id}):`, job.job_id);
+        if (!this.isDonation(job)) {
+          this.sendToPool("submit", job);
+        } else {
+          const donation = this.getDonation(job);
+          donation.submit(job);
+          // this.sendToStratumMiner(data);
+        }
+        this.emit("found", {
+          id: this.id,
+          login: this.login,
+          job
+        });
+        break;
+      }
     }
   }
 
@@ -251,6 +313,13 @@ class Miner extends EventEmitter {
     });
   }
 
+  handleResult(response: StratumResponse): void {
+    if(this.stratumSocket) {
+      console.log('sending result back to miner', response)
+      this.sendToStratumMiner(response);
+    }
+  }
+
   handleAccepted(job: StratumJob): void {
     this.hashes++;
     console.log(`shares accepted (${this.id}):`, this.hashes);
@@ -284,11 +353,18 @@ class Miner extends EventEmitter {
     );
     if (this.online) {
       if (error.error === "invalid_site_key") {
-        this.sendToMiner({
-          type: "error",
-          params: error
-        });
+        if(this.ws) {
+          this.sendToMiner({
+            type: "error",
+            params: error
+          });
+        }
       }
+      
+      if(this.stratumSocket) {
+        this.sendToStratumMiner(error);
+      }
+      
       this.emit("error", {
         id: this.id,
         login: this.login,
@@ -298,56 +374,6 @@ class Miner extends EventEmitter {
     this.kill();
   }
   
-  handleStratumMessage(message: string) {
-    let data: StratumRequest;
-    try {
-      data = JSON.parse(message);
-    } catch (e) {
-      console.warn(`can't parse message as JSON from miner:`, message, e.message);
-      return;
-    }
-    
-    switch (data.method) {
-      case "login": {
-        
-        console.log('LOGIN MINER', data)
-        
-        const params = data.params as CoinHiveLoginParams;
-        this.login = this.address || params.site_key;
-        const user = this.user || params.user;
-        if (user) {
-          this.login += "." + user;
-        }
-        if (this.diff) {
-          this.login += "+" + this.diff;
-        }
-        this.sendToPool("login", {
-          login: this.login,
-          pass: this.pass
-        });
-        break;
-      }
-
-      case "submit": {
-        const job = data.params as Job;
-        console.log(`job submitted (${this.id}):`, job.job_id);
-        if (!this.isDonation(job)) {
-          this.sendToPool("submit", job);
-        } else {
-          const donation = this.getDonation(job);
-          donation.submit(job);
-          // this.sendToStratumMiner(data);
-        }
-        this.emit("found", {
-          id: this.id,
-          login: this.login,
-          job
-        });
-        break;
-      }
-    }
-  }
-
   handleMessage(message: string) {
     let data: CoinHiveRequest;
     try {

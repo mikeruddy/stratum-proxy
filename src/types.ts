@@ -63,6 +63,7 @@ export type CoinHiveRequest = {
 
 export type CoinHiveLoginParams = {
   site_key: string;
+  login?: string | null;
   user: string | null;
 };
 
@@ -93,6 +94,7 @@ export type StratumRequest = {
   method: string;
   params: StratumRequestParams;
   retry?: number;
+  result?: any;
 };
 
 export type StratumRequestParams = StratumLoginParams | StratumJob | StratumKeepAlive | StratumEmptyParams;
