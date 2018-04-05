@@ -43,7 +43,7 @@ declare class Miner extends EventEmitter {
     handleAuthed(auth: string, response: StratumResponse): void;
     handleJob(job: Job, request: StratumRequest): void;
     handleResult(response: StratumResponse): void;
-    handleAccepted(job: StratumJob): void;
+    handleAccepted(job: StratumJob, response: any): void;
     handleError(error: StratumError): void;
     handleMessage(message: string): void;
     isDonation(job: Job): boolean;

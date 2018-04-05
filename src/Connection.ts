@@ -145,10 +145,6 @@ class Connection extends EventEmitter {
       const minerId = this.rpc[response.id].minerId;
       const method = this.rpc[response.id].message.method;
       
-      if(!data.method && response.result && response.result.status === 'OK') {
-        this.emit(minerId + ":result", data);
-      }
-      
       switch (method) {
         case "login": {
           if (response.error && response.error.code === -1) {
@@ -179,6 +175,10 @@ class Connection extends EventEmitter {
           break;
         }
         default: {
+          if(!data.method && response.result && response.result.status === 'OK') {
+            this.emit(minerId + ":result", data);
+          }
+          
           if (response.error && response.error.code === -1) {
             this.emit(minerId + ":error", response.error, response);
           }
@@ -198,7 +198,6 @@ class Connection extends EventEmitter {
             return;
           }
           
-          // console.log('EMIT JOB', request)
           this.emit(minerId + ":job", request.params, request);
           break;
         }

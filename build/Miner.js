@@ -150,7 +150,6 @@ var Miner = /** @class */ (function (_super) {
         });
     };
     Miner.prototype.kill = function () {
-        console.log('KILL ', this.id);
         this.queue.stop();
         this.connection.removeMiner(this.id);
         this.connection.removeAllListeners(this.id + ":authed");
@@ -329,7 +328,7 @@ var Miner = /** @class */ (function (_super) {
             this.sendToStratumMiner(response);
         }
     };
-    Miner.prototype.handleAccepted = function (job) {
+    Miner.prototype.handleAccepted = function (job, response) {
         this.hashes++;
         console.log("shares accepted (" + this.id + "):", this.hashes);
         Metrics_1.sharesCounter.inc();
@@ -343,7 +342,7 @@ var Miner = /** @class */ (function (_super) {
             });
         }
         if (this.stratumSocket) {
-            this.sendToStratumMiner(job);
+            this.sendToStratumMiner(response);
         }
         this.emit("accepted", {
             id: this.id,

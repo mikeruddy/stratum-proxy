@@ -273,7 +273,7 @@ class Proxy extends EventEmitter {
     if(this.portStratum) {
       var server = net.createServer();
       server.on('connection', handleConnection);
-      server.listen(9999, function() {  
+      server.listen(this.portStratum, function() {  
         console.log('server listening to %j', server.address());
       });
     }

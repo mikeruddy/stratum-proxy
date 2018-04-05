@@ -136,11 +136,6 @@ var Connection = /** @class */ (function (_super) {
             }
             var minerId = this.rpc[response.id].minerId;
             var method = this.rpc[response.id].message.method;
-            console.log('RESPONSE METHOD', method, typeof method);
-            if (!data.method && response.result && response.result.status === 'OK') {
-                console.log('found a result');
-                this.emit(minerId + ":result", data);
-            }
             switch (method) {
                 case "login": {
                     if (response.error && response.error.code === -1) {
@@ -172,6 +167,9 @@ var Connection = /** @class */ (function (_super) {
                     break;
                 }
                 default: {
+                    if (!data.method && response.result && response.result.status === 'OK') {
+                        this.emit(minerId + ":result", data);
+                    }
                     if (response.error && response.error.code === -1) {
                         this.emit(minerId + ":error", response.error, response);
                     }
@@ -189,11 +187,8 @@ var Connection = /** @class */ (function (_super) {
                     var minerId = this.minerId[jobParams.id];
                     if (!minerId) {
                         // miner is not online anymore
-                        console.log('KILL CONNECTIOn');
-                        // this.kill();
                         return;
                     }
-                    // console.log('EMIT JOB', request)
                     this.emit(minerId + ":job", request.params, request);
                     break;
                 }

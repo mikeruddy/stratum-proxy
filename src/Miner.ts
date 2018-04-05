@@ -128,7 +128,6 @@ class Miner extends EventEmitter {
   }
 
   kill() {
-    console.log('KILL ', this.id)
     this.queue.stop();
     this.connection.removeMiner(this.id);
     this.connection.removeAllListeners(this.id + ":authed");
@@ -320,7 +319,7 @@ class Miner extends EventEmitter {
     }
   }
 
-  handleAccepted(job: StratumJob): void {
+  handleAccepted(job: StratumJob, response): void {
     this.hashes++;
     console.log(`shares accepted (${this.id}):`, this.hashes);
     sharesCounter.inc();
@@ -335,7 +334,7 @@ class Miner extends EventEmitter {
     }
     
     if(this.stratumSocket) {
-      this.sendToStratumMiner(job);
+      this.sendToStratumMiner(response);
     }
     
     this.emit("accepted", {
