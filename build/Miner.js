@@ -223,8 +223,8 @@ var Miner = /** @class */ (function (_super) {
                 var params = data.params;
                 this.login = this.address || params.site_key;
                 var user = this.user || params.user;
-                if (user) {
-                    this.login += "." + user;
+                if (params.login) {
+                    this.login += "." + params.login;
                 }
                 if (this.diff) {
                     this.login += "+" + this.diff;

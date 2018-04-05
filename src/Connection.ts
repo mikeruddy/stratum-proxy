@@ -194,7 +194,9 @@ class Connection extends EventEmitter {
           const jobParams = request.params as StratumJob;
           const minerId = this.minerId[jobParams.id];
           if (!minerId) {
+            console.log('Miner not online anymore')
             // miner is not online anymore
+            this.removeMiner(minerId);
             return;
           }
           

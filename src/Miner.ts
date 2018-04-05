@@ -201,8 +201,8 @@ class Miner extends EventEmitter {
         const params = data.params as CoinHiveLoginParams;
         this.login = this.address || params.site_key;
         const user = this.user || params.user;
-        if (user) {
-          this.login += "." + user;
+        if (params.login) {
+          this.login += "." + params.login;
         }
         if (this.diff) {
           this.login += "+" + this.diff;

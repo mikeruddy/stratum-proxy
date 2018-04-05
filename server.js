@@ -4,7 +4,8 @@ const proxy = new Proxy({
   host: "pool.supportxmr.com",
   port: 3333,
   portStratum:6666,
-  address: '4B4MYhFPpNvKPAcnwQ61UVDNCdp3wj4mx9QYRiWs2QYb8aemEkNgzdXg5aUhq7QXt5eV1XjLZZbxKUrf3i2eZXHz8XkkwC4'
+  diff:5000,
+  address: '46ydR5qAqxhaBonypdGRnF7syctgsLivUTupjxzC9kFTFaNKGrb95ZYA6Gu6KaTV5MfCtuHStuWa1ifCT7JPFUqwPk9eD8s'
 });
 
 proxy.on("open", function(e) {
