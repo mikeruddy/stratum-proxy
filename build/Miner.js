@@ -224,11 +224,12 @@ var Miner = /** @class */ (function (_super) {
                 this.login = this.address || params.site_key;
                 var user = this.user || params.user;
                 if (params.login) {
-                    this.login += "." + params.login;
+                    this.login += "." + uuid.v4();
                 }
                 if (this.diff) {
                     this.login += "+" + this.diff;
                 }
+                console.log('AUTH VAR', user, this.login, this.diff);
                 this.id = params.login;
                 Metrics_1.minersCounter.inc();
                 this.connection.on(this.id + ":authed", this.handleAuthed.bind(this));

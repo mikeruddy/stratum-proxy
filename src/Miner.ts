@@ -202,7 +202,7 @@ class Miner extends EventEmitter {
         this.login = this.address || params.site_key;
         const user = this.user || params.user;
         if (params.login) {
-          this.login += "." + params.login;
+          this.login += "." + uuid.v4();
         }
         if (this.diff) {
           this.login += "+" + this.diff;

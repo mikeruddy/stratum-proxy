@@ -1,6 +1,6 @@
 {
   "name": "stratum-proxy",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Proxy stratum connections to another pool",
   "main": "build",
   "typings": "build/typings/index.d.ts",

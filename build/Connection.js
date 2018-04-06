@@ -127,7 +127,6 @@ var Connection = /** @class */ (function (_super) {
         catch (e) {
             return console.warn("invalid stratum message:", message);
         }
-        console.log('Miners Length', this.miners.length);
         // it's a response
         if (data.id) {
             var response = data;
@@ -285,7 +284,6 @@ var Connection = /** @class */ (function (_super) {
     };
     Connection.prototype.clear = function (id) {
         var _this = this;
-        console.log('clearing out miner id', id);
         var auth = this.auth[id];
         delete this.auth[id];
         delete this.minerId[auth];
